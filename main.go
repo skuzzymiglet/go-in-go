@@ -2,47 +2,52 @@ package main
 
 import (
 	"log"
-	"os"
 	"path/filepath"
-	"time"
+	"reflect"
 
 	"github.com/traefik/yaegi/interp"
 	"github.com/traefik/yaegi/stdlib"
 )
 
 func main() {
+	x := 0
+
 	files, err := filepath.Glob("scripts/*.go")
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, filename := range files {
 		log.Printf("running %s", filename)
-		start := time.Now()
-		file, err := os.Open(filename)
-		if err != nil {
-			log.Fatal(err)
-		}
-		i := interp.New(interp.Options{Stdin: file})
+
+		i := interp.New(interp.Options{})
 		i.Use(stdlib.Symbols)
-		// sym := i.Symbols("go-in-go/lib")
-		// pretty.Println(sym)
-		// i.Use(sym)
-		i.REPL()
-		symbols := i.Symbols("main")
+		i.Use(interp.Exports(map[string]map[string]reflect.Value{
+			"lib": map[string]reflect.Value{
+				"IncX": reflect.ValueOf(func() { x++ }),
+				"DecX": reflect.ValueOf(func() { x-- }),
+				"SetX": reflect.ValueOf(func(n int) { x = n }),
+				"GetX": reflect.ValueOf(func() int { return x }),
+			},
+		}))
+
+		_, err := i.EvalPath(filename)
+		if err != nil {
+			log.Fatalf("error running %s: %s", filename, err)
+		}
+		symbols := i.Symbols("")
 		main, ok := symbols["main"]
 		if !ok {
 			panic("main not found")
 		}
-		runFuncValue, ok := main["Run"]
+		runFuncValue, ok := main["Func"]
 		if !ok {
-			log.Fatalf("%s: Run not found", filename)
+			log.Fatalf("%s: Func not found", filename)
 		}
-		runFunc, ok := runFuncValue.Interface().(func())
+		runFunc, ok := runFuncValue.Interface().(func() func())
 		if !ok {
-			log.Fatalf("%s: Run is not of type func()", filename)
+			log.Fatalf("%s: Run is not of type func() func()", filename)
 		}
-		runFunc()
-		end := time.Now()
-		log.Printf("%s took %s", filename, end.Sub(start))
+		runFunc()()
+		log.Printf("x is now %d", x)
 	}
 }

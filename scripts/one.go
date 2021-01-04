@@ -2,15 +2,13 @@ package main
 
 import (
 	"fmt"
-
-	"./lib"
+	"lib"
+	"math/rand"
 )
 
-func Run() {
-	lib.SetPix(5)
-	if lib.GetPix() != 5 {
-		fmt.Println("disaster")
-	} else {
-		fmt.Println("wohoo!")
+func Func() func() {
+	return func() {
+		fmt.Println(lib.GetX())
+		lib.SetX(rand.Int())
 	}
 }
